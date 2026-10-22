@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adaptive Data Lab 2.0 · Self-Organizing Data Structure</title>
+<meta name="description" content="Watch a self-organizing list in C-verified logic adapt to changing access patterns, read its decisions, and reproduce the benchmark.">
+<style>
+:root{--bg:#f4f7fb;--surface:#fff;--ink:#14202e;--muted:#51627a;--line:#d5deea;--accent:#0b6e8a;--accent-ink:#fff;--hl:#f2c14e;
+--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b2a;--surface:#16263a;--ink:#e8eef6;--muted:#9db0c7;--line:#2a3d55;--accent:#4cc3df;--accent-ink:#06222b;--hl:#c9962a}}
+:root[data-theme="dark"]{--bg:#0f1b2a;--surface:#16263a;--ink:#e8eef6;--muted:#9db0c7;--line:#2a3d55;--accent:#4cc3df;--accent-ink:#06222b;--hl:#c9962a}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 var(--sans)}
+a{color:var(--accent)}:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding:0 22px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:18px 0;font-size:15px}
+.top nav{display:flex;gap:18px;align-items:center}.top a{text-decoration:none;color:var(--muted)}
+button,select,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}
+.btn{display:inline-block;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;border:2px solid var(--accent);background:transparent;color:var(--accent)}
+.btn.main{background:var(--accent);color:var(--accent-ink)}.btn.sm{padding:6px 12px;font-size:14px}
+.ghost{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 11px;font-size:14px}
+h1{font:700 clamp(32px,5vw,52px)/1.1 var(--serif);margin:10px 0 14px;letter-spacing:-.01em}
+.lead{font-size:19px;color:var(--muted);max-width:36em;margin:0 0 14px}.by{font-size:15px;color:var(--muted);margin:0 0 22px}.by strong{color:var(--ink)}
+section{padding:42px 0;border-top:1px solid var(--line)}
+h2{font:700 clamp(24px,3.4vw,32px)/1.2 var(--serif);margin:0 0 10px}
+h3{font:700 18px var(--serif);margin:0 0 4px}
+.intro{color:var(--muted);max-width:42em;margin:0 0 20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+.ctl{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;margin-bottom:16px}
+.ctl label{display:flex;flex-direction:column;font-size:13px;color:var(--muted);gap:3px}
+.ctl select,.ctl input{padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:auto;max-width:130px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 14px;min-height:34px}
+.chip{min-width:34px;padding:3px 6px;text-align:center;border-radius:7px;border:1px solid var(--line);background:var(--bg);font:13px var(--mono)}
+.chip.hit{background:var(--hl);border-color:var(--hl);color:#1b1500;font-weight:700}
+.grid{display:grid;grid-template-columns:1.1fr 1fr;gap:22px}
+.stats{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:10px}
+.stats div{font-size:13px;color:var(--muted)}.stats b{display:block;font:700 24px var(--serif);color:var(--ink)}
+.log{list-style:none;margin:0;padding:0;font-size:14px;color:var(--muted);max-height:260px;overflow:auto}
+.log li{padding:7px 0;border-bottom:1px solid var(--line)}.log li:first-child{color:var(--ink)}
+svg.chart{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);margin:6px 0 0}
+.legend i{display:inline-block;width:12px;height:3px;margin-right:6px;vertical-align:middle;border-radius:2px}
+table{width:100%;border-collapse:collapse;font-size:15px;margin:14px 0}
+th,td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line)}th:first-child,td:first-child{text-align:left;font-family:var(--mono);font-size:14px}
+th{font-weight:600;color:var(--muted);font-size:13px}
+tr.best td{font-weight:700}
+.note{font-size:14px;color:var(--muted);max-width:46em}
+ul.l{color:var(--muted);padding-left:20px;margin:6px 0}ul.l li{margin:5px 0}
+pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto;font:14px/1.6 var(--mono)}
+footer{border-top:1px solid var(--line);padding:28px 0 48px;font-size:15px;color:var(--muted)}footer strong{color:var(--ink)}
+@media (max-width:800px){.grid{grid-template-columns:1fr}.top nav a.h{display:none}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top"><strong>Adaptive Data Lab 2.0</strong>
+<nav><a class="h" href="#play">Playground</a><a class="h" href="#bench">Benchmark</a><a class="h" href="#learn">Policies</a><a class="h" href="#run">Run in C</a>
+<button class="ghost" id="theme" type="button" aria-label="Switch colour theme">Theme</button></nav></header>
+<main>
+<div style="padding:24px 0 34px">
+<h1>Watch a data structure learn what you ask for</h1>
+<p class="lead">A self-organizing list that reorders itself around popular keys, switches policy when the workload changes, and shows its reasoning. The page’s engine reproduces the C benchmark’s counts exactly.</p>
+<p class="by">Built by <strong>Asutosh Sahoo</strong>, Veer Surendra Sai University of Technology</p>
+<a class="btn main" href="#play">Start the playground</a> <a class="btn" href="https://github.com/asutosh-source/self-organizing-ds">Source on GitHub</a>
+</div>
+
+<section id="play">
+<h2>Live playground</h2>
+<p class="intro">Pick a workload and a policy, press Start, and watch the front of the list. The yellow key is the one just looked up. A fixed-order list runs the same lookups alongside, so you can see what adapting saves. The demo uses 40 keys and a 128-lookup window; the benchmark below uses a 1,024-lookup window.</p>
+<div class="panel">
+<div class="ctl">
+<label>Workload<select id="pw"><option value="zipf">Skewed (Zipf-like)</option><option value="phase">Phase change</option><option value="uniform">Uniform</option><option value="scan">Sequential scan</option></select></label>
+<label>Policy<select id="pp"><option value="adaptive">Adaptive</option><option value="mtf">Move-to-Front</option><option value="transpose">Transpose</option><option value="freq">Frequency Count</option><option value="fixed">Fixed</option></select></label>
+<label>Speed<select id="ps"><option value="1">Slow</option><option value="4" selected>Medium</option><option value="20">Fast</option></select></label>
+<button class="btn main sm" id="go" type="button">Start</button>
+<button class="btn sm" id="hot" type="button">Move the hot set</button>
+<button class="ghost" id="rs" type="button">Reset</button>
+</div>
+<div class="grid">
+<div>
+<h3>Front of the list</h3>
+<div class="chips" id="chips" aria-live="off"></div>
+<div class="stats">
+<div><b id="s1">–</b>this policy: avg comparisons</div>
+<div><b id="s2">–</b>fixed list: avg comparisons</div>
+<div><b id="s3">0</b>policy switches</div>
+<div><b id="s4">fixed</b>current policy</div>
+</div>
+<h3>Cost per 20 lookups</h3>
+<svg class="chart" id="pc" viewBox="0 0 520 190" role="img" aria-label="Live chart of comparisons per lookup"></svg>
+<div class="legend"><span><i style="background:var(--accent)"></i>selected policy</span><span><i style="background:#8796ab"></i>fixed list</span></div>
+</div>
+<div><h3>Why it did that</h3>
+<ul class="log" id="log" aria-live="polite"><li>Press Start. Adaptive decisions appear here once per window.</li></ul></div>
+</div>
+</div>
+</section>
+
+<section id="bench">
+<h2>Benchmark explorer</h2>
+<p class="intro">Every structure replays the same seeded trace. Change the settings and run it, or press the experiment button to repeat the headline test: a hot set that moves halfway through.</p>
+<div class="panel">
+<div class="ctl">
+<label>Workload<select id="bw"><option value="phase">Phase change</option><option value="zipf">Skewed (Zipf-like)</option><option value="uniform">Uniform</option><option value="scan">Sequential scan</option></select></label>
+<label>Keys<input id="bn" type="number" min="10" max="5000" value="1000"></label>
+<label>Lookups<input id="bo" type="number" min="2000" max="200000" step="1000" value="100000"></label>
+<label>Seed<input id="bs" type="number" min="1" value="42"></label>
+<button class="btn main sm" id="br" type="button">Run</button>
+<button class="btn sm" id="bx" type="button">Run phase-change experiment</button>
+</div>
+<p class="note" id="bst" aria-live="polite">Running the default experiment…</p>
+<div style="overflow-x:auto"><table id="bt"></table></div>
+<h3>Cost over time</h3>
+<svg class="chart" id="bc" viewBox="0 0 640 230" role="img" aria-label="Comparisons per lookup over time for each policy"></svg>
+<div class="legend" id="bl"></div>
+<p style="margin:14px 0 0"><button class="ghost" id="d1" type="button">Download results.csv</button> <button class="ghost" id="d2" type="button">Download timeline.csv</button> <button class="ghost" id="d3" type="button">Download config.json</button></p>
+</div>
+<p class="note" style="margin-top:14px"><b>How recovery is measured.</b> Recovery starts at the moment the hot set changes, not at a policy switch. It is the number of lookups until a 250-lookup window costs no more than 1.25 times the average of the four windows before the change. Values are multiples of 250. A value of 0 means the policy never got worse; “never” means it did not recover.</p>
+<p class="note">Comparison counts are deterministic and match the C program for the same keys, lookups and seed. This page measures comparisons only. It does not report speed, because browser timings say nothing about native C performance.</p>
+<ul class="l note" style="max-width:46em">
+<li>On skewed traffic, self-organizing lists do roughly four to five times less lookup work than the fixed list.</li>
+<li>On a scan, plain Move-to-Front does about twice the work of the fixed list. The adaptive policy notices the low skew and avoids that.</li>
+<li>Adaptive pays a little against always-Move-to-Front on skewed traffic (its warm-up window). In return it never collapses on a scan.</li>
+<li>Try it yourself with other sizes and seeds before trusting any one result. Adaptive can win on one workload and lose on another.</li></ul>
+</section>
+
+<section id="learn">
+<h2>The policies</h2>
+<div style="overflow-x:auto"><table>
+<tr><th>Policy</th><th style="text-align:left">What it does</th><th style="text-align:left">Strength</th><th style="text-align:left">Weakness</th></tr>
+<tr><td>fixed</td><td style="text-align:left">Never reorders</td><td style="text-align:left">No overhead</td><td style="text-align:left">Ignores hot keys</td></tr>
+<tr><td>mtf</td><td style="text-align:left">Found key jumps to the front</td><td style="text-align:left">Adapts fast</td><td style="text-align:left">Bad on scans</td></tr>
+<tr><td>transpose</td><td style="text-align:left">Found key swaps one step forward</td><td style="text-align:left">Stable on scans</td><td style="text-align:left">Slow to adapt</td></tr>
+<tr><td>freq</td><td style="text-align:left">Sorted by hit count</td><td style="text-align:left">Best on stable skew</td><td style="text-align:left">Slow after a shift</td></tr>
+<tr><td>adaptive</td><td style="text-align:left">Turns Move-to-Front on only when traffic is skewed</td><td style="text-align:left">Avoids scan penalty</td><td style="text-align:left">Warm-up and monitoring cost</td></tr>
+</table></div>
+<p class="note">All five are O(n) per lookup in the worst case. Search cost is what changes, plus a constant amount of pointer work when reordering.</p>
+</section>
+
+<section id="run">
+<h2>Run the real C program</h2>
+<pre>git clone https://github.com/asutosh-source/self-organizing-ds.git
+cd self-organizing-ds
+make test     # 24 checks against a reference model
+make demo     # watch lists reorder and the policy switch
+make bench    # writes results.csv and timeline.csv</pre>
+<p class="note">The C code is the reference implementation. This page’s engine is a JavaScript port, checked to give identical comparison counts, policy switches and recovery times on all four workloads at 1,000 keys, 100,000 lookups and seed 42.</p>
+</section>
+</main>
+<footer><strong>Asutosh Sahoo</strong> · Veer Surendra Sai University of Technology · MIT licence · <a href="https://github.com/asutosh-source/self-organizing-ds">Source code</a></footer>
+</div>
+<script>
+var M=(1n<<64n)-1n;
+function Rng(seed){var s=BigInt(seed);if(s===0n)s=1n;
+  this.next=function(){s=(s+0x9E3779B97F4A7C15n)&M;var z=s;z=((z^(z>>30n))*0xBF58476D1CE4E5B9n)&M;z=((z^(z>>27n))*0x94D049BB133111EBn)&M;return z^(z>>31n);};
+  this.dbl=function(){return Number(this.next()>>11n)/9007199254740992;};}
+function shuf(n,r){var a=[],i,j,t;for(i=0;i<n;i++)a.push(i);
+  for(i=n;i>1;i--){j=Number(r.next()%BigInt(i));t=a[i-1];a[i-1]=a[j];a[j]=t;}return a;}
+function Trace(kind,n,seed){
+  var r=new Rng(seed),p1=shuf(n,r),p2=shuf(n,r),cdf=new Float64Array(n),sum=0,i;
+  for(i=0;i<n;i++){sum+=Math.pow(i+1,-1.1);cdf[i]=sum;}
+  for(i=0;i<n;i++)cdf[i]/=sum;
+  this.second=false;
+  this.next=function(i){
+    if(kind==="uniform")return Number(r.next()%BigInt(n));
+    if(kind==="scan")return i%n;
+    var u=r.dbl(),lo=0,hi=n-1,m;
+    while(lo<hi){m=lo+((hi-lo)>>1);if(cdf[m]<u)lo=m+1;else hi=m;}
+    return (this.second?p2:p1)[lo];};}
+function Engine(kind,n,win){
+  var keys=new Array(n),f=new Int32Array(n),e=this,cnt=new Map(),seen=0,prev=[],prevSk=false,wn=0,i;
+  for(i=0;i<n;i++)keys[i]=i;
+  e.cmp=0;e.sw=0;e.keys=keys;e.msg=null;e.pol=kind==="adaptive"?"fixed":kind;
+  e.get=function(k){
+    e.msg=null;var i=keys.indexOf(k),c=i+1,p=e.pol;e.cmp+=c;
+    if(p==="mtf"){if(i>0){keys.splice(i,1);keys.unshift(k);}}
+    else if(p==="transpose"){if(i>0){keys[i]=keys[i-1];keys[i-1]=k;}}
+    else if(p==="freq"){f[k]++;if(i>0&&f[keys[i-1]]<f[k]){keys.splice(i,1);var j=0;while(j<keys.length&&f[keys[j]]>=f[k])j++;keys.splice(j,0,k);}}
+    if(kind==="adaptive"){cnt.set(k,(cnt.get(k)||0)+1);if(++seen>=win)evalWin();}
+    return c;};
+  function evalWin(){
+    var arr=Array.from(cnt.entries()).sort(function(a,b){return b[1]-a[1];});
+    var K=Math.max(1,Math.min(16,Math.floor(arr.length/10))),cov=0,tk=[],j;
+    for(j=0;j<K;j++){cov+=arr[j][1];tk.push(arr[j][0]);}
+    var share=cov/seen,ov=1;
+    if(prev.length){var m=0;tk.forEach(function(k){if(prev.indexOf(k)>=0)m++;});ov=m/tk.length;}
+    var sk=share>=0.30,want=sk?"mtf":"fixed",ch=want!==e.pol,shift=sk&&prevSk&&ov<0.5;wn++;
+    e.msg="Window "+wn+": the "+K+" hottest keys got "+Math.round(share*100)+"% of hits (skew threshold 30%)"+
+      (shift?"; the hot set changed ("+Math.round(ov*100)+"% overlap with the last window)":"")+" → "+
+      (sk?"skewed":"uniform or scan")+(ch?", so switching to "+(sk?"Move-to-Front":"fixed order"):", so keeping "+(e.pol==="mtf"?"Move-to-Front":"fixed order"))+".";
+    if(ch){e.pol=want;e.sw++;}
+    prev=tk;prevSk=sk;cnt.clear();seen=0;}}
+var KINDS=["fixed","mtf","transpose","freq","adaptive"],WIN=250;
+function bench(w,n,ops,seed){
+  var t=new Trace(w,n,seed),sh=w==="phase"?Math.floor(ops/2/WIN)*WIN:0,ks=new Int32Array(ops),i;
+  for(i=0;i<ops;i++){t.second=sh>0&&i>=sh;ks[i]=t.next(i);}
+  var nw=Math.floor(ops/WIN),out=[];
+  KINDS.forEach(function(kd){
+    var e=new Engine(kd,n,1024),series=[],wi,b,en,c0,x;
+    for(wi=0;wi<nw;wi++){b=wi*WIN;en=wi+1===nw?ops:b+WIN;c0=e.cmp;for(x=b;x<en;x++)e.get(ks[x]);series.push((e.cmp-c0)/(en-b));}
+    var rec="n/a",sw=sh/WIN;
+    if(sh&&sw>=4&&sw<nw){var base=(series[sw-4]+series[sw-3]+series[sw-2]+series[sw-1])/4;rec=-1;
+      for(wi=sw;wi<nw;wi++)if(series[wi]<=base*1.25){rec=(wi-sw)*WIN;break;}}
+    out.push({name:kd,cmp:e.cmp,per:e.cmp/ops,sw:e.sw,rec:rec,series:series});});
+  return {w:w,n:n,ops:ops,seed:seed,shift:sh,res:out};}
+var COL={fixed:"#8796ab",mtf:"#0b8fb0",transpose:"#8b6bd1",freq:"#d98a1f",adaptive:"#d6457a"};
+var $=function(i){return document.getElementById(i);};
+function lines(svg,W,H,list,vline){
+  var L=40,B=H-24,T=10,R=W-10,max=0,i;
+  list.forEach(function(s){s.d.forEach(function(v){if(v>max)max=v;});});max=Math.max(1,Math.ceil(max/50)*50);
+  var len=Math.max.apply(null,list.map(function(s){return s.d.length;}))||1,h="";
+  for(i=0;i<=4;i++){var y=B-(B-T)*i/4;h+='<line x1="'+L+'" x2="'+R+'" y1="'+y+'" y2="'+y+'" stroke="var(--line)"/><text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="var(--muted)">'+Math.round(max*i/4)+'</text>';}
+  h+='<text x="'+L+'" y="'+(H-6)+'" font-size="11" fill="var(--muted)">lookups →</text>';
+  if(vline!==undefined){var vx=L+(R-L)*vline/len;h+='<line x1="'+vx+'" x2="'+vx+'" y1="'+T+'" y2="'+B+'" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="'+(vx+4)+'" y="'+(T+10)+'" font-size="11" fill="var(--muted)">hot set changes</text>';}
+  list.forEach(function(s){var p=s.d.map(function(v,k){return (L+(R-L)*k/Math.max(1,len-1)).toFixed(1)+","+(B-(B-T)*v/max).toFixed(1);}).join(" ");
+    h+='<polyline fill="none" stroke="'+s.c+'" stroke-width="2.2" stroke-linejoin="round" points="'+p+'"/>';});
+  svg.innerHTML=h;}
+/* ---- playground ---- */
+var P={t:null,a:null,b:null,n:40,i:0,last:-1,wa:0,wb:0,pa:[],pb:[],timer:null,log:[]};
+function pReset(){
+  if(P.timer){clearInterval(P.timer);P.timer=null;$("go").textContent="Start";}
+  P.t=new Trace($("pw").value,P.n,7);P.a=new Engine($("pp").value,P.n,128);P.b=new Engine("fixed",P.n,128);
+  P.i=0;P.last=-1;P.wa=0;P.wb=0;P.pa=[];P.pb=[];P.log=[];
+  $("log").innerHTML="<li>Press Start. Adaptive decisions appear here once per window.</li>";pDraw();}
+function pStep(){
+  if($("pw").value==="phase"&&P.i===1000&&!P.t.second){P.t.second=true;P.log.unshift("Phase change: the hot set moved after 1,000 lookups.");$("log").innerHTML=P.log.slice(0,8).map(function(m){return "<li>"+m+"</li>";}).join("");}
+  var k=P.t.next(P.i++),ca=P.a.get(k),cb=P.b.get(k);P.last=k;P.wa+=ca;P.wb+=cb;
+  if(P.a.msg){P.log.unshift(P.a.msg);$("log").innerHTML=P.log.slice(0,8).map(function(m){return "<li>"+m+"</li>";}).join("");}
+  if(P.i%20===0){P.pa.push(P.wa/20);P.pb.push(P.wb/20);P.wa=0;P.wb=0;if(P.pa.length>50){P.pa.shift();P.pb.shift();}}}
+function pDraw(){
+  var h="";P.a.keys.slice(0,22).forEach(function(k){h+='<span class="chip'+(k===P.last?" hit":"")+'">'+k+'</span>';});
+  $("chips").innerHTML=h+'<span class="chip" style="border-style:dashed">…</span>';
+  $("s1").textContent=P.i?(P.a.cmp/P.i).toFixed(1):"–";$("s2").textContent=P.i?(P.b.cmp/P.i).toFixed(1):"–";
+  $("s3").textContent=P.a.sw;$("s4").textContent=P.a.pol==="mtf"?"move-to-front":P.a.pol;
+  lines($("pc"),520,190,[{c:COL.fixed,d:P.pb},{c:"var(--accent)",d:P.pa}]);}
+$("go").onclick=function(){
+  if(P.timer){clearInterval(P.timer);P.timer=null;this.textContent="Start";return;}
+  this.textContent="Pause";
+  P.timer=setInterval(function(){var s=+$("ps").value,j;for(j=0;j<s;j++)pStep();pDraw();},100);};
+$("hot").onclick=function(){P.t.second=!P.t.second;
+  P.log.unshift("You moved the hot set to a new group of keys. Watch the next windows for the response.");
+  $("log").innerHTML=P.log.slice(0,8).map(function(m){return "<li>"+m+"</li>";}).join("");};
+function syncHotButton(){var w=$("pw").value;$("hot").disabled=(w==="uniform"||w==="scan");$("hot").title=$("hot").disabled?"Hot-set changes apply to skewed and phase-change workloads":"Move the hot set to the other key group";}
+$("rs").onclick=pReset;$("pw").onchange=function(){pReset();syncHotButton();};$("pp").onchange=pReset;
+/* ---- benchmark explorer ---- */
+var BR=null;
+function bRun(){
+  var w=$("bw").value,n=Math.min(5000,Math.max(10,+$("bn").value||1000)),requestedOps=Math.min(200000,Math.max(2000,+$("bo").value||100000)),ops=Math.min(requestedOps,Math.max(2000,Math.floor(300000000/(2.5*n)))),seed=Math.max(1,+$("bs").value||42);
+  $("bn").value=n;$("bo").value=ops;$("bs").value=seed;
+  $("bst").textContent="Running "+KINDS.length+" policies on "+ops.toLocaleString()+" lookups…"+(ops<requestedOps?" Reduced from "+requestedOps.toLocaleString()+" to keep the browser responsive at this list size.":"");
+  setTimeout(function(){
+    BR=bench(w,n,ops,seed);var best=0;BR.res.forEach(function(r,i){if(r.per<BR.res[best].per)best=i;});
+    var h="<tr><th>Policy</th><th>Comparisons per lookup</th><th>Policy switches</th><th>Recovery (lookups)</th></tr>";
+    BR.res.forEach(function(r,i){h+='<tr'+(i===best?' class="best"':'')+'><td>'+r.name+'</td><td>'+r.per.toFixed(2)+'</td><td>'+r.sw+'</td><td>'+(r.rec===-1?"never":r.rec)+'</td></tr>';});
+    $("bt").innerHTML=h;
+    lines($("bc"),640,230,BR.res.map(function(r){return {c:COL[r.name],d:r.series};}),BR.shift?BR.shift/WIN:undefined);
+    $("bl").innerHTML=BR.res.map(function(r){return '<span><i style="background:'+COL[r.name]+'"></i>'+r.name+'</span>';}).join("");
+    $("bst").textContent="Done: "+w+", "+n+" keys, "+ops.toLocaleString()+" lookups, seed "+seed+". Fewest comparisons: "+BR.res[best].name+" (bold).";},30);}
+function dl(name,text){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/csv"}));a.download=name;document.body.appendChild(a);a.click();a.remove();}
+$("d1").onclick=function(){if(!BR)return;var s="workload,policy,n_keys,ops,seed,comparisons,cmp_per_lookup,policy_switches,recovery_ops\n";
+  BR.res.forEach(function(r){s+=[BR.w,r.name,BR.n,BR.ops,BR.seed,r.cmp,r.per.toFixed(4),r.sw,r.rec].join(",")+"\n";});dl("results.csv",s);};
+$("d2").onclick=function(){if(!BR)return;var s="workload,policy,window,ops_end,avg_comparisons\n";
+  BR.res.forEach(function(r){r.series.forEach(function(v,i){s+=[BR.w,r.name,i,(i+1)*WIN,v.toFixed(4)].join(",")+"\n";});});dl("timeline.csv",s);};
+$("d3").onclick=function(){if(!BR)return;dl("experiment-config.json",JSON.stringify({project:"Adaptive Data Lab 2.0",engine:"browser JavaScript port",workload:BR.w,keys:BR.n,lookups:BR.ops,seed:BR.seed,adaptive_window:1024,chart_window:WIN,recovery_definition:"first 250-lookup window after hot-set change at or below 1.25x the mean of the four preceding windows",timing_claims:false},null,2));};
+$("br").onclick=bRun;
+$("bx").onclick=function(){$("bw").value="phase";$("bn").value=1000;$("bo").value=100000;$("bs").value=42;bRun();};
+/* ---- theme ---- */
+$("theme").onclick=function(){var r=document.documentElement,d=r.getAttribute("data-theme")==="dark"||(!r.getAttribute("data-theme")&&matchMedia("(prefers-color-scheme: dark)").matches);r.setAttribute("data-theme",d?"light":"dark");};
+pReset();syncHotButton();setTimeout(bRun,50);
+</script>
+</body>
+</html>
