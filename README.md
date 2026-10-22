@@ -148,3 +148,9 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 Built by **Asutosh Sahoo** · Veer Surendra Sai University of Technology (VSSUT)
+
+## Interactive web app
+
+**[Open Adaptive Data Lab](https://asutosh-source.github.io/self-organizing-ds/)** · [Web app source](docs/index.html) · [Run and deployment guide](docs/WEB_APP.md)
+
+The browser playground is a JavaScript demonstration. Treat its measurements as browser-simulated until validated against the native C implementation; browser timing must not be presented as native C performance.
