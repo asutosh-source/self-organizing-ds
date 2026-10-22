@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Self-Organizing Data Structure · Adaptive Data Lab</title>
+<meta name="description" content="A self-organizing list in C that learns from access patterns, switches policy when the workload changes, and measures whether adapting was worth the cost.">
+<style>
+:root{
+  --bg:#f4f7fb; --surface:#ffffff; --ink:#14202e; --muted:#51627a; --line:#d5deea;
+  --accent:#0b6e8a; --accent-ink:#ffffff; --warn:#b4531a; --bar:#0b6e8a; --bar-base:#9fb0c4;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1b2a; --surface:#16263a; --ink:#e8eef6; --muted:#9db0c7; --line:#2a3d55;
+    --accent:#4cc3df; --accent-ink:#06222b; --warn:#f0925a; --bar:#4cc3df; --bar-base:#5d728c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1b2a; --surface:#16263a; --ink:#e8eef6; --muted:#9db0c7; --line:#2a3d55;
+  --accent:#4cc3df; --accent-ink:#06222b; --warn:#f0925a; --bar:#4cc3df; --bar-base:#5d728c;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 var(--sans)}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding:0 22px}
+header.top{display:flex;justify-content:space-between;align-items:center;padding:18px 0;font-size:15px}
+header.top nav{display:flex;gap:20px;align-items:center}
+header.top a{text-decoration:none;color:var(--muted)}
+header.top a:hover{color:var(--ink)}
+button{font:inherit;cursor:pointer}
+.theme{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:4px 10px;font-size:14px}
+
+.hero{display:grid;grid-template-columns:1.05fr 1fr;gap:44px;align-items:center;padding:34px 0 56px}
+h1{font:700 clamp(34px,5.4vw,56px)/1.08 var(--serif);margin:0 0 18px;letter-spacing:-.01em}
+.lead{font-size:19px;color:var(--muted);margin:0 0 22px;max-width:34em}
+.by{font-size:15px;color:var(--muted);margin:0 0 26px}
+.by strong{color:var(--ink)}
+.btns{display:flex;flex-wrap:wrap;gap:12px}
+.btn{display:inline-block;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600;border:2px solid var(--accent)}
+.btn.main{background:var(--accent);color:var(--accent-ink)}
+.btn.alt{color:var(--accent)}
+
+.lab{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+.lab h2{font:600 17px/1.3 var(--sans);margin:0 0 4px}
+.lab p.s{margin:0 0 16px;color:var(--muted);font-size:15px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.row label{font-size:14px;color:var(--muted)}
+select{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.list{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-height:58px;margin-bottom:16px}
+.node{width:48px;height:48px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font:700 20px var(--mono);transition:transform .25s}
+.node:hover{border-color:var(--accent)}
+.node.hit{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.arrow{color:var(--muted);font-size:14px}
+.stats{display:flex;gap:26px;font-size:15px;color:var(--muted);margin-bottom:12px}
+.stats b{display:block;font:700 26px var(--serif);color:var(--ink)}
+.reset{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;padding:6px 12px;font-size:14px}
+#msg{font-size:14px;color:var(--muted);min-height:22px;margin:8px 0 0}
+
+section{padding:46px 0;border-top:1px solid var(--line)}
+h2.sec{font:700 clamp(26px,3.6vw,34px)/1.2 var(--serif);margin:0 0 12px}
+section>p.intro{color:var(--muted);max-width:40em;margin:0 0 26px}
+.loop{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.loop div{padding:18px;border-right:1px solid var(--line)}
+.loop div:last-child{border-right:0}
+.loop h3{margin:0 0 6px;font:700 18px var(--serif)}
+.loop p{margin:0;font-size:15px;color:var(--muted)}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+.cols h3{font:700 19px var(--serif);margin:0 0 6px}
+.cols p,.cols li{color:var(--muted);font-size:16px}
+.cols ul{padding-left:20px;margin:6px 0 0}
+
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:26px 34px}
+.chart h3{font:700 18px var(--serif);margin:0 0 2px}
+.chart .cap{font-size:14px;color:var(--muted);margin:0 0 10px}
+.bar{display:grid;grid-template-columns:84px 1fr 56px;align-items:center;gap:10px;font-size:14px;margin:5px 0}
+.bar .name{font-family:var(--mono);font-size:13px}
+.bar .track{height:16px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar .fill{height:100%;background:var(--bar);border-radius:4px}
+.bar.base .fill{background:var(--bar-base)}
+.bar.bad .fill{background:var(--warn)}
+.bar .val{text-align:right;font-family:var(--mono);font-size:13px}
+.notes{margin-top:30px;max-width:44em}
+.notes li{margin:8px 0}
+pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;font:14px/1.6 var(--mono);margin:0 0 14px}
+.small{font-size:14px;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding:30px 0 50px;font-size:15px;color:var(--muted)}
+footer strong{color:var(--ink)}
+
+@media (max-width:800px){
+  .hero{grid-template-columns:1fr;gap:30px}
+  .loop{grid-template-columns:1fr 1fr}
+  .loop div:nth-child(2){border-right:0}
+  .loop div:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .cols,.charts{grid-template-columns:1fr}
+  header.top nav a.hide{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <strong>Adaptive Data Lab</strong>
+    <nav>
+      <a class="hide" href="#how">How it works</a>
+      <a class="hide" href="#results">Results</a>
+      <a class="hide" href="#run">Run it</a>
+      <button class="theme" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
+    </nav>
+  </header>
+
+  <main>
+  <div class="hero">
+    <div>
+      <h1>A list that learns what you look up most</h1>
+      <p class="lead">A self-organizing data structure written in C. It watches how keys are accessed, reorders itself to make popular keys cheap to find, and measures whether the change was worth the cost.</p>
+      <p class="by">Built by <strong>Asutosh Sahoo</strong>, Veer Surendra Sai University of Technology</p>
+      <div class="btns">
+        <a class="btn main" href="https://github.com/asutosh-source/self-organizing-ds">View on GitHub</a>
+        <a class="btn alt" href="#results">See the results</a>
+      </div>
+    </div>
+
+    <div class="lab" aria-label="Interactive Move-to-Front demo">
+      <h2>Try it: look up a key</h2>
+      <p class="s">Click any key. Its cost is the number of comparisons needed to find it.</p>
+      <div class="row">
+        <label for="policy">Policy</label>
+        <select id="policy">
+          <option value="mtf">Move-to-Front</option>
+          <option value="transpose">Transpose</option>
+          <option value="fixed">Fixed (no reordering)</option>
+        </select>
+        <button class="reset" id="reset" type="button">Reset</button>
+      </div>
+      <div class="list" id="list" role="group" aria-label="List of keys"></div>
+      <div class="stats">
+        <div><b id="last">–</b>last lookup</div>
+        <div><b id="total">0</b>total comparisons</div>
+      </div>
+      <p id="msg" aria-live="polite">Look up F a few times, then compare the policies.</p>
+    </div>
+  </div>
+
+  <section id="how">
+    <h2 class="sec">Observe, adapt, measure, prove</h2>
+    <p class="intro">Real workloads don’t stay still: popular keys change, bursts come and go. A fixed structure stays correct but can become slow. This project tests whether light-weight adaptation reduces work, and makes the trade-offs visible.</p>
+    <div class="loop">
+      <div><h3>Observe</h3><p>Count hits per key in a sliding window of 1,024 lookups.</p></div>
+      <div><h3>Adapt</h3><p>Classify the traffic as uniform, skewed or shifting, then pick a policy.</p></div>
+      <div><h3>Measure</h3><p>Count comparisons, reorder steps, time, memory and policy switches.</p></div>
+      <div><h3>Prove</h3><p>Replay identical seeded traces on every structure and publish the CSVs.</p></div>
+    </div>
+    <div class="cols" style="margin-top:34px">
+      <div>
+        <h3>Policies</h3>
+        <ul>
+          <li><b>Fixed list:</b> the baseline. Never reorders.</li>
+          <li><b>Move-to-Front:</b> a found key jumps to the head.</li>
+          <li><b>Transpose:</b> a found key swaps one step forward.</li>
+          <li><b>Frequency Count:</b> keeps the list sorted by hit count.</li>
+          <li><b>Adaptive:</b> turns Move-to-Front on only when the window looks skewed.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Built to be extended</h3>
+        <ul>
+          <li><b>Strategy:</b> policies are swappable function pointers.</li>
+          <li><b>Observer:</b> access and policy-change events can be hooked.</li>
+          <li><b>Factory and Adapter:</b> one get / put / erase API over every backend.</li>
+          <li><b>Command:</b> workload operations are replayable objects.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="results">
+    <h2 class="sec">What the benchmark shows</h2>
+    <p class="intro">1,000 keys, 100,000 lookups, seed 42. Each bar is the average number of comparisons per successful lookup: shorter is better. These counts are deterministic, so you get the same numbers on any machine.</p>
+    <div class="charts" id="charts"></div>
+    <ul class="notes">
+      <li>On skewed traffic, self-organizing lists do roughly four to five times less lookup work than the fixed list.</li>
+      <li>On a sequential scan, plain Move-to-Front does about <b>twice</b> the work of the fixed list. The adaptive policy notices the low skew and avoids that penalty.</li>
+      <li>On uniform traffic nothing helps, and the small differences are noise.</li>
+      <li>Adaptive pays a small price against always-Move-to-Front on skewed traffic (its warm-up window and monitoring), and in return it never collapses on a scan.</li>
+      <li>After the hot set changes, Move-to-Front and adaptive recover within 250 accesses. Frequency Count and Transpose need about 10,000, because old counts and slow one-step moves take time to overcome.</li>
+    </ul>
+    <p class="small">One list size and one seed. Run it with your own <code>--n</code> and <code>--seed</code> before drawing conclusions. Adaptive can win on one workload and lose on another.</p>
+  </section>
+
+  <section id="run">
+    <h2 class="sec">Run it yourself</h2>
+    <p class="intro">Pure C11 with no dependencies other than the math library.</p>
+<pre>git clone https://github.com/asutosh-source/self-organizing-ds.git
+cd self-organizing-ds
+make          # build
+make test     # 24 checks against a reference model
+make demo     # watch lists reorder and the policy switch
+make bench    # writes results.csv and timeline.csv</pre>
+    <p class="small">Every benchmark lookup is also verified against the stored value, so a speed-up can’t come from a wrong answer.</p>
+  </section>
+  </main>
+
+  <footer>
+    <strong>Asutosh Sahoo</strong> · Veer Surendra Sai University of Technology · MIT licence ·
+    <a href="https://github.com/asutosh-source/self-organizing-ds">Source code</a>
+  </footer>
+</div>
+
+<script>
+/* ---- interactive list ---- */
+(function(){
+  var KEYS = ["A","B","C","D","E","F"];
+  var order, total, listEl = document.getElementById("list"), msg = document.getElementById("msg");
+  var policySel = document.getElementById("policy");
+  function reset(){ order = KEYS.slice(); total = 0; document.getElementById("last").textContent = "–";
+    document.getElementById("total").textContent = "0"; draw(null); }
+  function draw(hit){
+    listEl.innerHTML = "";
+    order.forEach(function(k, i){
+      if (i) { var a = document.createElement("span"); a.className = "arrow"; a.textContent = "→"; a.setAttribute("aria-hidden","true"); listEl.appendChild(a); }
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "node" + (k === hit ? " hit" : ""); b.textContent = k;
+      b.setAttribute("aria-label", "Look up key " + k + ", position " + (i + 1));
+      b.onclick = function(){ access(k); };
+      listEl.appendChild(b);
+    });
+  }
+  function access(k){
+    var i = order.indexOf(k), cost = i + 1, p = policySel.value;
+    total += cost;
+    if (p === "mtf" && i > 0) { order.splice(i, 1); order.unshift(k); }
+    if (p === "transpose" && i > 0) { order.splice(i, 1); order.splice(i - 1, 0, k); }
+    document.getElementById("last").textContent = cost;
+    document.getElementById("total").textContent = total;
+    msg.textContent = "Found " + k + " after " + cost + (cost === 1 ? " comparison." : " comparisons.");
+    draw(k);
+  }
+  policySel.onchange = reset;
+  document.getElementById("reset").onclick = reset;
+  reset();
+})();
+
+/* ---- benchmark charts (comparisons per lookup, N=1000, 100k ops, seed 42) ---- */
+(function(){
+  var NAMES = ["fixed","mtf","transpose","freq","adaptive"];
+  var DATA = [
+    {t:"Uniform", c:"Every key equally likely", v:[501.34,500.79,501.39,501.72,501.34]},
+    {t:"Skewed (Zipf-like)", c:"A few hot keys dominate", v:[522.51,139.29,245.39,103.57,143.26]},
+    {t:"Phase change", c:"The hot set switches halfway", v:[534.49,139.95,274.63,128.98,143.91]},
+    {t:"Sequential scan", c:"Every key in turn, repeatedly", v:[500.50,995.00,500.55,500.50,500.50]}
+  ];
+  var root = document.getElementById("charts");
+  DATA.forEach(function(d){
+    var max = Math.max.apply(null, d.v), box = document.createElement("div");
+    box.className = "chart";
+    box.innerHTML = "<h3>" + d.t + "</h3><p class='cap'>" + d.c + "</p>";
+    d.v.forEach(function(v, i){
+      var cls = "bar" + (i === 0 ? " base" : "") + (v > d.v[0] * 1.5 ? " bad" : "");
+      var row = document.createElement("div");
+      row.className = cls;
+      row.innerHTML = "<span class='name'>" + NAMES[i] + "</span><span class='track'><span class='fill' style='display:block;width:" +
+        (v / max * 100).toFixed(1) + "%'></span></span><span class='val'>" + v.toFixed(0) + "</span>";
+      row.setAttribute("role","img");
+      row.setAttribute("aria-label", NAMES[i] + ": " + v.toFixed(1) + " comparisons per lookup");
+      box.appendChild(row);
+    });
+    root.appendChild(box);
+  });
+})();
+
+/* ---- theme toggle ---- */
+(function(){
+  var root = document.documentElement, btn = document.getElementById("theme");
+  btn.onclick = function(){
+    var dark = root.getAttribute("data-theme") === "dark" ||
+      (!root.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    root.setAttribute("data-theme", dark ? "light" : "dark");
+  };
+})();
+</script>
+</body>
+</html>
